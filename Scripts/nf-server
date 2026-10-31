@@ -1,0 +1,40 @@
+#!/bin/sh
+# Start the James Bond 007: Nightfire dedicated server (START_EXE).
+#
+# Runs `Bond2.exe -dedicated -port <NF_PORT> -queryport <NF_QUERY_PORT> -maxplayers
+# <NF_MAX_PLAYERS> -condebug [START_ARGS] +servercfgfile <NF_CONFIG> +map <NF_MAP>` under Wine,
+# from the game folder. Bond2.exe is the 5.9x patch's engine launcher (Bond.exe is its .NET
+# updater). The server console is a window, so -condebug logs it to bond/qconsole.log and this
+# script streams that file.
+set -e
+
+root="${SERVER_ROOT:-/config/Merged}"
+port="${NF_PORT:-26015}"
+query_port="${NF_QUERY_PORT:-6550}"
+max_players="${NF_MAX_PLAYERS:-16}"
+config="${NF_CONFIG:-lancommander.cfg}"
+map="${NF_MAP:-ctf_romania}"
+
+cd "$root"
+
+if [ ! -f Bond2.exe ]; then
+    echo "Bond2.exe not found in $root. Put a Nightfire 5.9x install in /config/Server." >&2
+    exit 1
+fi
+
+if [ ! -f "bond/$config" ]; then
+    echo "bond/$config not found; the configure hook should have written it." >&2
+    exit 1
+fi
+
+: > bond/qconsole.log
+tail -n +1 -F bond/qconsole.log 2>/dev/null &
+
+# START_ARGS go before +map so their cvars are set when the map loads
+set -- -dedicated -port "$port" -queryport "$query_port" -maxplayers "$max_players" -condebug \
+    "$@" +servercfgfile "$config" +map "$map"
+
+printf 'Starting: Bond2.exe %s\n' "$*"
+printf 'Game port %s/udp, GameSpy queries on %s/udp\n' "$port" "$query_port"
+
+exec wine-run Bond2.exe "$@"
